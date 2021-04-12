@@ -1,0 +1,82 @@
+(
+-- RAW metrics
+WITH RAW_ROW_COUNT AS (
+    SELECT
+        COUNT(1) AS RAW_ROW_COUNT
+    FROM
+        {{ raw_database }}.{{ raw_schema }}.{{ raw_table }}
+)
+, RAW_COLUMN_COUNT AS (
+    SELECT
+        COUNT(column_name) AS RAW_COLUMN_COUNT
+    FROM
+        {{ raw_database }}.INFORMATION_SCHEMA.columns
+    WHERE
+        table_catalog = '{{ raw_database }}'
+        AND table_schema = '{{ raw_schema }}'
+        AND table_name = '{{ raw_table }}'
+) 
+-- STAGE metrics
+, STAGE_ROW_COUNT AS (
+    SELECT
+        COUNT(1) AS STAGE_ROW_COUNT
+    FROM
+        {{ stage_database }}.{{ stage_schema }}.{{ stage_table }}
+)
+, STAGE_COLUMN_COUNT AS (
+    SELECT
+        COUNT(column_name) AS STAGE_COLUMN_COUNT
+    FROM
+        {{ stage_database }}.INFORMATION_SCHEMA.columns
+    WHERE
+        table_catalog = '{{ stage_database }}'
+        AND table_schema = '{{ stage_schema }}'
+        AND table_name = '{{ stage_table }}'
+) 
+-- DATASTORE metrics
+, DATASTORE_ROW_COUNT AS (
+    SELECT
+        COUNT(1) AS DATASTORE_ROW_COUNT
+    FROM
+        {{ datastore_database }}.{{ datastore_schema }}.{{ datastore_table }}
+)
+, DATASTORE_COLUMN_COUNT AS (
+    SELECT
+        COUNT(column_name) AS DATASTORE_COLUMN_COUNT
+    FROM
+        {{ datastore_database }}.INFORMATION_SCHEMA.columns
+    WHERE
+        table_catalog = '{{ datastore_database }}'
+        AND table_schema = '{{ datastore_schema }}'
+        AND table_name = '{{ datastore_table }}'
+)
+, DATASTORE_LOAD_COUNT AS (
+    SELECT COUNT(1) AS DATASTORE_LOAD_COUNT
+    FROM (
+        SELECT
+            DW_EFFECTIVE_TS
+        FROM
+            {{ datastore_database }}.{{ datastore_schema }}.{{ datastore_table }}
+        GROUP BY DW_EFFECTIVE_TS
+    )
+)
+, DATASTORE_LOAD_TIMES AS (
+    SELECT
+        MAX(DW_EFFECTIVE_TS) AS NEWEST_LOAD_DATE,
+        MIN(DW_EFFECTIVE_TS) AS OLDEST_LOAD_DATE
+    FROM
+        {{ datastore_database }}.{{ datastore_schema }}.{{ datastore_table }}
+)
+
+SELECT
+    '{{ datastore_table }}' AS TABLE_NAME, *, current_timestamp() AS QUERY_PERFORMED_AT
+FROM
+    RAW_ROW_COUNT,
+    RAW_COLUMN_COUNT,
+    STAGE_ROW_COUNT,
+    STAGE_COLUMN_COUNT,
+    DATASTORE_ROW_COUNT,
+    DATASTORE_COLUMN_COUNT,
+    DATASTORE_LOAD_COUNT,
+    DATASTORE_LOAD_TIMES
+)

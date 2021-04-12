@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Output & Input file
+sql_script_output.sql
+*.csv
