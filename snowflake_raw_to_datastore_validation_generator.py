@@ -2,6 +2,9 @@ from jinja2 import Environment, select_autoescape
 from jinja2.loaders import FileSystemLoader
 import os 
 
+FILENAME = 'Embroker - Source-to-Target Verification & QA - CSV Export.csv'
+TEMPLATE_NAME = 'snowflake_raw_to_datastore_validation.sql.jinja'
+
 # Creates the Jinja environment
 cwd = os.getcwd()
 templates_path = cwd + '/templates'
@@ -11,9 +14,9 @@ env = Environment(
 )
 
 # Indicates which file to get first
-template = env.get_template('snowflake_raw_to_datastore_validation.sql.jinja')
+template = env.get_template(TEMPLATE_NAME)
 
-file_input = open('Embroker - Source-to-Target Verification & QA - CSV Export.csv', 'r')
+file_input = open(FILENAME, 'r')
 
 keys_list = [
     'raw_database',
