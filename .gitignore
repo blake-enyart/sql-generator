@@ -132,3 +132,6 @@ dmypy.json
 # Output & Input file
 sql_script_output.sql
 *.csv
+
+# client specific models
+cytracom_models/
