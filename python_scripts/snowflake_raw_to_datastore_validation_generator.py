@@ -7,7 +7,7 @@ TEMPLATE_NAME = 'snowflake_raw_to_datastore_validation.sql.jinja'
 
 # Creates the Jinja environment
 cwd = os.getcwd()
-templates_path = cwd + '/templates'
+templates_path = os.path.join(cwd, 'templates')
 env = Environment(
     loader=FileSystemLoader(templates_path),
     autoescape=select_autoescape(['html', 'xml'])
@@ -55,6 +55,3 @@ with open('sql_script_output.sql', 'a') as file_output:
             file_output.write(
                 ";"
             )
-
-
-file_input.close()
