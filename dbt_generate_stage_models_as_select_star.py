@@ -4,9 +4,9 @@ from sqlalchemy import create_engine
 #from dotenv import load_dotenv 
 
 # define all static variables
-input_snowflake_sql = "cytracom_stg_view_gen.sql"
-client_models_path = "/cytracom_models/"
-models_to_iterate = 200
+INPUT_SNOWFLAKE_SQL = "cytracom_stg_view_gen.sql"
+CLIENT_MODELS_PATH = "/cytracom_models/"
+MODELS_TO_ITERATE = 200
   
 # load latest environment variable list
 #load_dotenv()
@@ -28,18 +28,18 @@ engine = create_engine(URL(
 #get current working directory
 cwd = os.getcwd()
 #build path to store generated models
-model_path = cwd + client_models_path
+model_path = cwd + CLIENT_MODELS_PATH
 
 
 # open client file containting view/ddl for creating dbt stg models
-f = open(input_snowflake_sql)
+f = open(INPUT_SNOWFLAKE_SQL)
 #read file contect into variable
 base_sql = f.read()
 
 # snowflake connect and execute
 try:
     conn = engine.connect()
-    models =  conn.execute(base_sql).fetchmany(models_to_iterate)
+    models =  conn.execute(base_sql).fetchmany(MODELS_TO_ITERATE)
 
     # iterate through all available models and generate files
     for model in models: 
