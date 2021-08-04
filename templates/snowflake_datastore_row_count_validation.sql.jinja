@@ -1,0 +1,11 @@
+select 
+    '{{ full_table_name }}' as table_name,
+    date_part(month, DW_EXTRACTED_TS) month_number,
+    MONTHNAME(DW_EXTRACTED_TS) month_name,
+    date_part(year, DW_EXTRACTED_TS) year_number,
+    count(*) rows_loaded
+from {{ full_table_name }}
+group by 
+    date_part(month, DW_EXTRACTED_TS), 
+    MONTHNAME(DW_EXTRACTED_TS), 
+    date_part(year, DW_EXTRACTED_TS)
