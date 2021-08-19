@@ -40,7 +40,7 @@ from  \n-- Necessary to switch between Development and Production data sources\n
       end || ''', ''' || lower(source_table) || ''') }}\n' || '    {% else %}\n' ||
     '        {{ source(''' || case source_schema
       when 'mimit_prod_2016_medstreaming_dbo' then 'mimit_prod_medstreaming'
-      else 'scource_tbd'
+      else 'source_tbd'
       end || ''', ''' || lower(source_table) || ''') }}\n' || '{% endif %}\n' ||'\n)\n' 
   
   as sql_text
