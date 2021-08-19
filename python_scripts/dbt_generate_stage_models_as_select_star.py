@@ -1,20 +1,26 @@
 import os
+from os.path import join, dirname
 from snowflake.sqlalchemy import URL
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
 
 # define all static variables
-INPUT_SNOWFLAKE_SQL = "cytracom_stg_view_gen.sql"
-CLIENT_MODELS_PATH = os.path.join(os.getenv("DBT_PROJECT_PATH"), "models")
+INPUT_SNOWFLAKE_SQL = "sql_scripts/medstreaming_stg_view_gen.sql"
 MODELS_TO_ITERATE = 200
 
+# get current working directory
+cwd = os.getcwd()
 # load latest environment variable list
-load_dotenv()
+# TODO: fix environment variable loading
+dotenv_path = join(cwd, '.env')
+load_dotenv(dotenv_path)
 
 # Setup the snowflake connection. Remember to update .env file if needed
 user = os.getenv("SNOWFLAKE_USER")
 password = os.getenv("SNOWFLAKE_PASSWORD")
 account = os.getenv("SNOWFLAKE_ACCOUNT")
+CLIENT_MODELS_PATH = os.getenv("DBT_PROJECT_PATH")
+SNOWFLAKE_DATABASE = 'EL_FIVETRAN_WORKFLOW'
 
 # sqlalchemy object for snowflake connection
 engine = create_engine(
@@ -22,13 +28,12 @@ engine = create_engine(
         account=account,
         user=user,
         password=password,
-        role="transformer_admin",
-        warehouse="transforming",
+        role="engineer_admin",
+        warehouse="engineering_adhoc",
+        database=SNOWFLAKE_DATABASE
     )
 )
 
-# get current working directory
-cwd = os.getcwd()
 # build path to store generated models
 model_path = CLIENT_MODELS_PATH
 
@@ -48,6 +53,7 @@ try:
         # build stage views
         sql_filepath = model_path + model["target_name"]
         with open(sql_filepath, "w+") as sql_file:
+            # print(model["stage_ddl"])
             sql_file.write(model["stage_ddl"])
             sql_file.close()
         # build yml files
