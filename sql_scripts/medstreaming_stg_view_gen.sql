@@ -9,7 +9,7 @@ with join_filter as (
       when 'mimit_test_2016_medstreaming_dbo' then 'mimit_medstreaming'
       else source_schema
     end || '__' || lower(source_table) || '.sql' as target_name,
-    lower(all_columns.column_name) as column_name,
+    upper(all_columns.column_name) as column_name,
     all_columns.ordinal_position,
     lower(all_columns.data_type) as data_type,
     character_maximum_length,
@@ -63,8 +63,8 @@ from  \n-- Necessary to switch between Development and Production data sources\n
     end 
     ||
     case
-      when data_type in ('text', 'varchar', 'varying') then 'trim(' || column_name || ') as ' || column_name
-      else column_name
+      when data_type in ('text', 'varchar', 'varying') then 'trim(' || '"' || column_name || '"' || ') as ' || '"' || column_name || '"'
+      else '"' || column_name || '"'
     end 
     as sql_text
   from
