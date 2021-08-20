@@ -7,23 +7,23 @@ from dotenv import load_dotenv
 # define all static variables
 INPUT_SNOWFLAKE_SQL = join("sql_scripts", "medstreaming_stg_view_gen.sql")
 MODELS_TO_ITERATE = 200
+CLIENT_MODELS_PATH = '/Users/blakeenyart/programming/projects/medstreaming/medstreaming_workflow_dbt/models/staging/mimit/medstreamingemrdb/'
+SNOWFLAKE_DATABASE = 'EL_FIVETRAN_WORKFLOW'
 
 # load latest environment variable list
 load_dotenv()
 
 # Setup the snowflake connection. Remember to update .env file if needed
-user = os.getenv("SNOWFLAKE_USER")
-password = os.getenv("SNOWFLAKE_PASSWORD")
-account = os.getenv("SNOWFLAKE_ACCOUNT")
-CLIENT_MODELS_PATH = os.getenv("DBT_PROJECT_PATH")
-SNOWFLAKE_DATABASE = 'EL_FIVETRAN_WORKFLOW'
+USER = os.getenv("SNOWFLAKE_USER")
+PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
+ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
 
 # sqlalchemy object for snowflake connection
 engine = create_engine(
     URL(
-        account=account,
-        user=user,
-        password=password,
+        account=ACCOUNT,
+        user=USER,
+        password=PASSWORD,
         role="engineer_admin",
         warehouse="engineering_adhoc",
         database=SNOWFLAKE_DATABASE
