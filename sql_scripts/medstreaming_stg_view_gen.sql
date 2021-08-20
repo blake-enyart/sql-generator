@@ -12,7 +12,8 @@ with join_filter as (
         'stg_' || case
         source_schema
             when
-                'mimit_test_2016_medstreamingemrdb_dbo' then 'mimit_medstreamingemrdb'
+                'mimit_test_2016_medstreamingemrdb_dbo'
+                then 'mimit_medstreamingemrdb'
             else source_schema
         end || '__' || lower(source_table) || '.sql' as target_name,
         upper(column_name) as "COLUMN_NAME",
@@ -35,8 +36,8 @@ src as (
             source_table
         ) || ' as (\n
 select *
-from  \n-- Necessary to switch between Development and Production data sources\n' ||
-        '{% if target.name == ' as 'dev'   ' %}\n' ||
+from  \n-- Necessary to switch between Development and Production data sources\n'
+        || '{% if target.name == ' as 'dev'      ' %}\n' ||
     '        {{ source(''' || case source_schema
       when 'mimit_test_2016_medstreamingemrdb_dbo' then 'mimit_test_medstreamingemrdb'
       else source_schema
