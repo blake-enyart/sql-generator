@@ -6,7 +6,7 @@ with join_filter as (
     lower(all_columns.table_name) as source_table,
     'stg_' || case
       source_schema
-      when 'mimit_test_2016_medstreaming_dbo' then 'mimit_medstreaming'
+      when 'mimit_test_2016_{{ datasource }}_dbo' then 'mimit_medstreaming'
       else source_schema
     end || '__' || lower(source_table) || '.sql' as target_name,
     upper(all_columns.column_name) as column_name,
@@ -19,7 +19,7 @@ with join_filter as (
   from
     information_schema.columns all_columns
   where
-    lower(table_schema) in ('mimit_test_2016_medstreaming_dbo')
+    lower(table_schema) in ('mimit_test_2016_{{ datasource }}_dbo')
 ),
 
 src as (
@@ -33,16 +33,21 @@ src as (
     'with ' || lower(source_table) || ' as (\n
 select *
 from  \n-- Necessary to switch between Development and Production data sources\n'||
+{% raw %}
     '{% if target.name == ''dev'' %}\n' ||
     '        {{ source(''' || case source_schema
-      when 'mimit_test_2016_medstreaming_dbo' then 'mimit_test_medstreaming'
+{% endraw %}
+      when 'mimit_test_2016_{{ datasource }}_dbo' then 'mimit_test_medstreaming'
       else source_schema
+{% raw %}
       end || ''', ''' || lower(source_table) || ''') }}\n' || '    {% else %}\n' ||
     '        {{ source(''' || case source_schema
-      when 'mimit_prod_2016_medstreaming_dbo' then 'mimit_prod_medstreaming'
+{% endraw %}
+      when 'mimit_prod_2016_{{ datasource }}_dbo' then 'mimit_prod_medstreaming'
       else 'source_tbd'
+{% raw %}
       end || ''', ''' || lower(source_table) || ''') }}\n' || '{% endif %}\n' ||'\n)\n' 
-  
+{% endraw %}
   as sql_text
   from
     join_filter
@@ -123,7 +128,7 @@ yml_gen as (
   from
     columns
   where
-    lower(table_schema) in ('mimit_test_2016_medstreaming_dbo')
+    lower(table_schema) in ('mimit_test_2016_{{ datasource }}_dbo')
 ),
 
 cte_yml as (
