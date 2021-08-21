@@ -6,7 +6,7 @@ with join_filter as (
     lower(all_columns.table_name) as source_table,
     'stg_' || case
       source_schema
-      when 'mimit_test_2016_{{ datasource }}_dbo' then 'mimit_medstreaming'
+      when 'mimit_test_2016_{{ datasource }}_dbo' then 'mimit_{{ datasource }}'
       else source_schema
     end || '__' || lower(source_table) || '.sql' as target_name,
     upper(all_columns.column_name) as column_name,
@@ -37,13 +37,13 @@ from  \n-- Necessary to switch between Development and Production data sources\n
     '{% if target.name == ''dev'' %}\n' ||
     '        {{ source(''' || case source_schema
 {% endraw %}
-      when 'mimit_test_2016_{{ datasource }}_dbo' then 'mimit_test_medstreaming'
+      when 'mimit_test_2016_{{ datasource }}_dbo' then 'mimit_test_{{ datasource }}'
       else source_schema
 {% raw %}
       end || ''', ''' || lower(source_table) || ''') }}\n' || '    {% else %}\n' ||
     '        {{ source(''' || case source_schema
 {% endraw %}
-      when 'mimit_prod_2016_{{ datasource }}_dbo' then 'mimit_prod_medstreaming'
+      when 'mimit_prod_2016_{{ datasource }}_dbo' then 'mimit_prod_{{ datasource }}'
       else 'source_tbd'
 {% raw %}
       end || ''', ''' || lower(source_table) || ''') }}\n' || '{% endif %}\n' ||'\n)\n' 
