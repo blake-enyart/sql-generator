@@ -5,21 +5,21 @@ from sqlalchemy import create_engine
 from dotenv import load_dotenv
 from jinja2 import Environment, select_autoescape
 from jinja2.loaders import FileSystemLoader
-import io
+
 
 # define all static variables
-TEMPLATE_NAME = 'medstreaming_stg_view_gen.sql.jinja'
+TEMPLATE_NAME = "medstreaming_stg_view_gen.sql.jinja"
 MODELS_TO_ITERATE = 200
-DATASOURCE = 'medstreaming'
-CLIENT_MODELS_PATH = f'/Users/blakeenyart/programming/projects/medstreaming/medstreaming_workflow_dbt/models/staging/mimit/{DATASOURCE}/'
-SNOWFLAKE_DATABASE = 'EL_FIVETRAN_WORKFLOW'
+DATASOURCE = "medstreaming"
+CLIENT_MODELS_PATH = f"/Users/blakeenyart/programming/projects/medstreaming/medstreaming_workflow_dbt/models/staging/mimit/{DATASOURCE}/"
+SNOWFLAKE_DATABASE = "EL_FIVETRAN_WORKFLOW"
 
 # Creates the Jinja environment
 cwd = os.getcwd()
-templates_path = join(cwd, 'templates')
+templates_path = join(cwd, "templates")
 env = Environment(
     loader=FileSystemLoader(templates_path),
-    autoescape=select_autoescape(['html', 'xml'])
+    autoescape=select_autoescape(["html", "xml"]),
 )
 
 # Indicates which file to get first
@@ -41,17 +41,13 @@ engine = create_engine(
         password=PASSWORD,
         role="engineer_admin",
         warehouse="engineering_adhoc",
-        database=SNOWFLAKE_DATABASE
+        database=SNOWFLAKE_DATABASE,
     )
 )
 
-keys_list = [
-    'datasource'
-]
+keys_list = ["datasource"]
 
-values_list = [
-  DATASOURCE
-]
+values_list = [DATASOURCE]
 
 # Create dictionary from list of keys and values
 line_dict = dict(zip(keys_list, values_list))
