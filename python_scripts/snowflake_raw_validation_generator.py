@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from dotenv import load_dotenv
 import os
 
-TEMPLATE_NAME = "snowflake_raw_metrics_brightview.sql.jinja"
+TEMPLATE_NAME = "snowflake_raw_metrics.sql.jinja"
 
 load_dotenv()
 
