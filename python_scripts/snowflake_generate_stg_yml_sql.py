@@ -9,18 +9,18 @@ from jinja2.loaders import FileSystemLoader
 
 # define all static variables
 TEMPLATE_NAME = "snowflake_stg_view_gen.sql.jinja"
-MODELS_TO_ITERATE = 1
-CLIENT_MODELS_PATH = "/home/blake-enyart/data_warehouse_dbt/models/staging/"
+MODELS_TO_ITERATE = 1000
+CLIENT_MODELS_PATH = "/home/blake-enyart/data_warehouse_dbt/models/raw/"
 SNOWFLAKE_DATABASE = "raw_airbyte"
 GENERATOR_CONFIG = {
     "database": SNOWFLAKE_DATABASE.lower(),
     # Must generate staging models for a single schema at a time
-    "schema_filter": "orthofi__dbo",
+    "schema_filter": "orthofi__billing",
     # Use to generate a single staging model set to None for only schema filters
     "table_filter": None,
     # Use to exclude a set pattern for tables such as "_airbyte_"
     "table_filter_fuzzy_exclude": "_airbyte_",
-    "dbt_source_name": "orthofi__dbo",
+    "dbt_source_name": "orthofi__billing",
 }
 
 # Creates the Jinja environment

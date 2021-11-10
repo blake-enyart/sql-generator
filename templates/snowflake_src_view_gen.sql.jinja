@@ -1,0 +1,99 @@
+with columns as (
+  select
+    *
+  from
+    {{ database }}.information_schema.columns
+),
+
+columns_gen as (
+  select
+    table_schema,
+    table_name,
+    ordinal_position,
+    '        - name: ' || lower(column_name) as yml
+  from
+    columns
+  where
+    lower(table_schema) in ('{{ schema_filter }}')
+    {%- if table_filter_fuzzy_exclude %}
+    and lower(table_name) not like ('%{{ table_filter_fuzzy_exclude }}%')
+    {% endif %}
+),
+
+yml_agg_columns as (
+  select
+    lower(table_schema) as source_schema,
+    lower(table_name) as source_table,
+    listagg(yml, '\n') within group (
+      order by
+        ordinal_position
+    ) as column_data
+  from
+    columns_gen
+  group by
+    1,
+    2
+),
+
+tables as (
+  select
+    *
+  from
+    {{ database }}.information_schema.tables
+),
+
+table_gen as (
+  select
+    table_catalog,
+    table_schema,
+    table_name,
+    '    - name: ' || lower(table_name) || '\n' ||
+    '      description: tbd'  as yml
+  from
+    tables
+  where
+    lower(table_schema) in ('{{ schema_filter }}')
+    {%- if table_filter_fuzzy_exclude %}
+    and lower(table_name) not like ('%{{ table_filter_fuzzy_exclude }}%')
+    {% endif %}
+),
+
+table_column_join as (
+  select
+    table_catalog,
+    table_schema,
+    table_name,
+    yml || '\n' ||
+    '      columns:\n' ||
+    column_data as table_column_data
+  from
+    table_gen tbl
+    join yml_agg_columns yac on
+        lower(tbl.table_schema) = yac.source_schema
+        and lower(tbl.table_name) = yac.source_table
+),
+
+yml_agg_tables as (
+  select
+    lower(table_schema) as source_schema,
+    listagg(table_column_data, '\n') within group (
+      order by
+        table_name
+    ) as yml_data
+  from
+    table_column_join
+  group by
+    1
+)
+
+select
+  'version: 2\n\n' ||
+  'sources:\n' ||
+  '  - name: ' || '{{ dbt_source_name }}' || '\n' ||
+  '    database: ' || '{{ database }}' || '\n' ||
+  '    schema: ' || '{{ schema_filter }}' || '\n' ||
+  '    loaded_at_field: ' || '{{ loaded_at_field }}' || '\n' ||
+  '    tables:\n' || 
+  yml_data as yml_data
+from
+  yml_agg_tables
