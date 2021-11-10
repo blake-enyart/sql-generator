@@ -1,18 +1,27 @@
 import os
 from os.path import join
 from snowflake.sqlalchemy import URL
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from dotenv import load_dotenv
 from jinja2 import Environment, select_autoescape
 from jinja2.loaders import FileSystemLoader
 
 
 # define all static variables
-TEMPLATE_NAME = "medstreaming_stg_view_gen.sql.jinja"
-MODELS_TO_ITERATE = 200
-DATASOURCE = "medstreaming"
-CLIENT_MODELS_PATH = f"/Users/blakeenyart/programming/projects/medstreaming/medstreaming_workflow_dbt/models/staging/mimit/{DATASOURCE}/"
-SNOWFLAKE_DATABASE = "EL_FIVETRAN_WORKFLOW"
+TEMPLATE_NAME = "snowflake_stg_view_gen.sql.jinja"
+MODELS_TO_ITERATE = 1
+CLIENT_MODELS_PATH = "/home/blake-enyart/data_warehouse_dbt/models/staging/"
+SNOWFLAKE_DATABASE = "raw_airbyte"
+GENERATOR_CONFIG = {
+    "database": SNOWFLAKE_DATABASE.lower(),
+    # Must generate staging models for a single schema at a time
+    "schema_filter": "orthofi__dbo",
+    # Use to generate a single staging model set to None for only schema filters
+    "table_filter": None,
+    # Use to exclude a set pattern for tables such as "_airbyte_"
+    "table_filter_fuzzy_exclude": "_airbyte_",
+    "dbt_source_name": "orthofi__dbo",
+}
 
 # Creates the Jinja environment
 cwd = os.getcwd()
@@ -32,6 +41,8 @@ load_dotenv()
 USER = os.getenv("SNOWFLAKE_USER")
 PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
 ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
+ROLE = os.getenv("SNOWFLAKE_ROLE")
+WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE")
 
 # sqlalchemy object for snowflake connection
 engine = create_engine(
@@ -39,19 +50,14 @@ engine = create_engine(
         account=ACCOUNT,
         user=USER,
         password=PASSWORD,
-        role="engineer_admin",
-        warehouse="engineering_adhoc",
+        role=ROLE,
+        warehouse=WAREHOUSE,
         database=SNOWFLAKE_DATABASE,
     )
 )
 
-keys_list = ["datasource"]
-
-values_list = [DATASOURCE]
-
-# Create dictionary from list of keys and values
-line_dict = dict(zip(keys_list, values_list))
-base_sql = template.render(line_dict)
+# Generate Jinja SQL template
+base_sql = template.render(GENERATOR_CONFIG)
 
 # snowflake connect and execute
 try:
@@ -60,8 +66,14 @@ try:
 
     # iterate through all available models and generate files
     for model in models:
+        # build directories
+        dir_path = join(
+            CLIENT_MODELS_PATH, 
+            GENERATOR_CONFIG["schema_filter"], 
+        )
+        os.makedirs(dir_path, exist_ok=True)
+        sql_filepath = join(dir_path, model["target_name"])
         # build stage views
-        sql_filepath = CLIENT_MODELS_PATH + model["target_name"]
         with open(sql_filepath, "w+") as sql_file:
             sql_file.write(model["stage_ddl"])
             sql_file.close()
