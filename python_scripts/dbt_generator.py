@@ -127,7 +127,7 @@ class DbtSourceGenerator:
             "loaded_at_field": self.LOADED_AT_FIELD.lower(),
         }
 
-        print("\n")
+        print("----------------------")
         print("Using the following parameters to generate scripts:")
         [print(f"{k.upper()}: {v}") for k,v in self.GENERATOR_CONFIG.items()]
         print("----------------------")
@@ -237,7 +237,7 @@ class DbtStageGenerator:
         self.DBT_SOURCE_NAME = config.DBT_SOURCE_NAME
         self.MODEL_OUTPUT_DIR_PATH = join(config.DBT_PROJECT_PATH, "models", "staging")
 
-        table_filter_prompt = "Would you like to generate a single set of files (.sql/.yml) for one source table? (Y/n): "
+        table_filter_prompt = "Would you like to generate a single set of stage files (.sql/.yml) for one source table? (Y/n): "
         text = os.getenv("TABLE_FILTER") or input(table_filter_prompt) or "y"
         text = text.lower()
         if text == "y":
@@ -261,11 +261,11 @@ class DbtStageGenerator:
             "dbt_source_name": self.DBT_SOURCE_NAME.lower(),
         }
 
-        print("\n")
+        print("----------------------")
         print("Using the following parameters to generate scripts:")
         [print(f"{k.upper()}: {v}") for k,v in self.GENERATOR_CONFIG.items()]
         print("----------------------")
-        print("\n")
+
         self.engine = config.engine
 
         self.source_generator()
@@ -289,7 +289,106 @@ class DbtStageGenerator:
         print("----------------------")
         conn = self.engine.connect()
         models = conn.execute(base_sql).fetchmany(self.MODELS_TO_ITERATE)
+        exists_cnt = 0
+        create_cnt = 0
+        if len(models) == 1:
+             self.produce_single_src_file(models=models)
+        for model in models:
+            dir_path = join(
+                self.MODEL_OUTPUT_DIR_PATH,
+                self.GENERATOR_CONFIG["schema_filter"],
+            )
+            sql_filepath = join(dir_path, model["target_name"])
+            if exists(sql_filepath):
+                exists_cnt += 1
+            else:
+                create_cnt += 1
+        prompt_msg = f"""
+            With these parameters, the stage files (.sql/.yml) would behave as:
+            - {exists_cnt} set(s) of stage files would be overwritten 
+            - {create_cnt} set(s) of stage files would be created 
+            
+            How do you want to proceed?
+            1 - Overwrite all old files and create all new files
+            2 - Only create new files
+            3 - Only overwrite existing files
+            4 - Cancel
+            Respond with a numeric option (1-4): """
+        prompt_msg = re.sub(" +", " ", prompt_msg)
+        prompt_msg = re.sub("\n +", "\n", prompt_msg)
 
+        cancel_msg = "Cancelling generation of a set of stage files (.sql/.yml)"
+        confirm_msg = "Are you sure you want to overwrite existing files? (y/N): "
+        
+        text = ""
+        while text not in ["1", "2", "3", "4"]:
+            text = input(prompt_msg) or "4"
+            if text == "4":
+                print(cancel_msg)
+                sys.exit()
+            elif text == "1":
+                text = ""
+                while text not in ["y", "n"]:
+                    text = input(confirm_msg) or "n"
+                    text = text.lower()
+                    if text == "y":
+                        self.produce_all_src_files(models=models, overwrite=True, create=True)
+                    elif text == "n":
+                        print(cancel_msg)
+                        sys.exit()
+                    else:
+                        text = input(confirm_msg) or "n"
+                        text = text.lower()
+                print(cancel_msg)
+                sys.exit()
+            elif text == "2":
+                self.produce_all_src_files(models=models, overwrite=False, create=True)
+            elif text == "3":
+                text = ""
+                while text not in ["y", "n"]:
+                    text = input(confirm_msg) or "n"
+                    text = text.lower()
+                    if text == "y":
+                        self.produce_all_src_files(models=models, overwrite=True, create=False)
+                    elif text == "n":
+                        print(cancel_msg)
+                        sys.exit()
+                    else:
+                        text = input(confirm_msg) or "n"
+                        text = text.lower()
+                print(cancel_msg)
+                sys.exit()
+
+    def produce_all_src_files(self, models, overwrite: bool = False, create: bool = True):
+        overwrite_cnt = 0
+        created_cnt = 0
+
+        for model in models:
+            # build directories
+            dir_path = join(
+                self.MODEL_OUTPUT_DIR_PATH,
+                self.GENERATOR_CONFIG["schema_filter"],
+            )
+            os.makedirs(dir_path, exist_ok=True)
+            sql_filepath = join(dir_path, model["target_name"])
+
+            base_name = model["target_name"].replace(".sql", "")
+            # file exists and overwrite is true
+            if exists(sql_filepath) and overwrite:
+                self.produce_src_files(
+                    dir_path=dir_path, model=model, base_name=base_name, silent=True
+                )
+                overwrite_cnt += 1
+            # file does not exist and create is true
+            elif not exists(sql_filepath) and create:
+                self.produce_src_files(
+                    dir_path=dir_path, model=model, base_name=base_name, silent=True
+                )
+                created_cnt += 1
+        success_msg = f"Created {created_cnt} set(s) of stage files and overwrote {overwrite_cnt} set(s) of stage files."
+        print(success_msg)
+
+    def produce_single_src_file(self, models):
         for model in models:
             # build directories
             dir_path = join(
@@ -302,22 +401,22 @@ class DbtStageGenerator:
             base_name = model["target_name"].replace(".sql", "")
             if exists(sql_filepath):
                 prompt_msg = f"""
-                    Would you like to overwrite the stage files (.sql/.yml) for: "{base_name}"?
+                    Would you like to overwrite the set of stage files (.sql/.yml) for: "{base_name}"?
                     
                     WARNING: Proceeding will erase any modifications and restore stage files to defaults.
                     Respond (N/y): """
             else:
                 prompt_msg = f"""
-                    Would you like to create the stage files (.sql/.yml) for: "{base_name}"?
+                    Would you like to create the set of stage files (.sql/.yml) for: "{base_name}"?
                     Respond (N/y): """
             prompt_msg = re.sub(" +", " ", prompt_msg)
             prompt_msg = re.sub("\n +", "\n", prompt_msg)
             text = ""
-            while text.lower() not in ["n", "y", "all"]:
+            while text.lower() not in ["n", "y"]:
                 text = input(prompt_msg) or "n"
                 if text.lower() == "n":
                     print(
-                        f"""Cancelling generation of stage files (.sql/.yml) for "{base_name}" """
+                        f"""Cancelling generation of a set of stage files (.sql/.yml) for "{base_name}" """
                     )
                     sys.exit()
                 elif text.lower() == "y":
@@ -329,7 +428,7 @@ class DbtStageGenerator:
                     text = input(prompt_msg)
                     if text.lower() == "n":
                         print(
-                            f"""Cancelling generation of stage files (.sql/.yml) for "{base_name}" """
+                            f"""Cancelling generation of a set of stage files (.sql/.yml) for "{base_name}" """
                         )
                         sys.exit()
                     elif text.lower() == "y":
@@ -337,7 +436,7 @@ class DbtStageGenerator:
                             dir_path=dir_path, model=model, base_name=base_name
                         )
 
-    def produce_src_files(self, dir_path: str, model, base_name: str):
+    def produce_src_files(self, dir_path: str, model, base_name: str, silent: bool = False):
         sql_filepath = join(dir_path, model["target_name"])
 
         if exists(sql_filepath):
@@ -367,7 +466,9 @@ class DbtStageGenerator:
 
         success_msg = re.sub(" +", " ", success_msg)
         success_msg = re.sub("\n +", "\n", success_msg)
-        print(success_msg)
+
+        if not silent:
+            print(success_msg)
 
 
 if __name__ == "__main__":

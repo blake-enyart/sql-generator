@@ -1,8 +1,24 @@
 # sql-generator
-Generates SQL scripts built based in Python, Jinja templates, and SQL. This is a prototype for data testing.
+Generates SQL scripts built based in Python, Jinja templates, and SQL. This is a prototype for data testing and generating dbt source/staging files.
 
 ## Getting Started
-The only script in here at the moment generates a batch of data quality checks that consist of row counts, column counts, number of loads to the DATASTORE, and what are the oldest and newest load dates for a specific table in the DATASTORE.
+Start by installing `python` and then `pip install poetry`. After poetry is installed, run `poetry config virtualenvs.in-project true` then `poetry install`.
+
+The most developed script in the repo is the [dbt_generator.py](python_scripts/dbt_generator.py). There are two paths to using this tool to generate dbt source/staging models.
+
+### Option 1
+- Duplicate the [.env.sample](.env.sample) and rename to `.env`
+- Fill out all of the variables in the new `.env` file 
+- Run `python python_scripts/dbt_generator.py` and follow the prompts to complete the generation script
+
+### Option 2
+- Duplicate the [.env.sample](.env.sample) and rename to `.env`
+- Fill out only the mandatory variables in the new `.env` file 
+- Run `python python_scripts/dbt_generator.py` and follow the prompts to complete the generation script
+
+### Option 3
+
+There are several other rudimentary scripts in here at the moment that generate a batch of data quality checks that consist of row counts, column counts, number of loads to the DATASTORE, and what are the oldest and newest load dates for a specific table in the DATASTORE.
 
 This script is a brittle and rudimentary SQL generator for now, but will hopefully serve as a launch point for later development.
 
