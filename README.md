@@ -2,7 +2,10 @@
 Generates SQL scripts built based in Python, Jinja templates, and SQL. This is a prototype for data testing and generating dbt source/staging files.
 
 ## Getting Started
-Start by installing `python` and then `pip install poetry`. After poetry is installed, run `poetry config virtualenvs.in-project true` then `poetry install`.
+Start by installing `python` and then `pip install poetry`. After poetry is installed, run:
+- `poetry config virtualenvs.in-project true`
+- `poetry install`
+- `poetry shell`
 
 The most developed script in the repo is the [dbt_generator.py](python_scripts/dbt_generator.py). There are two paths to using this tool to generate dbt source/staging models.
 
