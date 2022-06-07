@@ -10,7 +10,8 @@ columns_gen as (
     table_schema,
     table_name,
     ordinal_position,
-    '        - name: ' || lower(column_name) as yml
+    '        - name: ' || column_name || '\n' ||
+    '          quote: true' as yml
   from
     columns
   where
@@ -48,7 +49,8 @@ table_gen as (
     table_schema,
     table_name,
     '    - name: ' || lower(table_name) || '\n' ||
-    '      description: tbd'  as yml
+    '      description: tbd' || '\n' ||
+    '      identifier: ' || table_name  as yml
   from
     tables
   where
@@ -93,7 +95,9 @@ select
   '    database: ' || '{{ database }}' || '\n' ||
   '    schema: ' || '{{ schema_filter }}' || '\n' ||
   '    loaded_at_field: ' || '{{ loaded_at_field }}' || '\n' ||
+  '    quoting:' || '\n' ||
+  '      identifier: true' || '\n' ||
   '    tables:\n' || 
-  yml_data as yml_data
+  yml_data || '\n' as yml_data
 from
   yml_agg_tables
