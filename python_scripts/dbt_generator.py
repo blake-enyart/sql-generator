@@ -2,13 +2,18 @@ import os
 from os.path import join
 from snowflake.sqlalchemy import URL
 from sqlalchemy import create_engine
-from sqlalchemy.engine.base import Engine
+from sqlalchemy.exc import DatabaseError
+
+# from sqlalchemy.schema import MetaData
+from sqlalchemy import inspect
+
 from dotenv import load_dotenv
 from jinja2 import Environment, select_autoescape
 from jinja2.loaders import FileSystemLoader
 import re
 from os.path import exists
 import sys
+import pandas as pd
 
 
 class DbtSqlGenerator:
@@ -20,6 +25,11 @@ class DbtSqlGenerator:
     ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
     ROLE = os.getenv("SNOWFLAKE_ROLE")
     WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE")
+    snowflake_config = [USER, PASSWORD, ACCOUNT, ROLE, WAREHOUSE]
+    snowflake_config = [x != "" for x in snowflake_config]
+    if not all(snowflake_config):
+        print("Please configure Snowflake credentials in .env")
+        sys.exit()
     database_msg = "Which Snowflake database would you like to use? (i.e raw_airbyte): "
     SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE") or input(database_msg)
 
@@ -36,9 +46,14 @@ class DbtSqlGenerator:
                     database=self.SNOWFLAKE_DATABASE,
                 )
             )
+            self.conn = self.engine.connect()
+        except DatabaseError as e:
+            print("Have you turned on the VPN to access the Snowflake instance?")
+            print(f"{type(e).__name__}:", e.orig)
+            sys.exit()
         except Exception as e:
             env_msg = """
-            Remember to configure your .env file prior to running this script
+            Remember to correctly configure your .env file prior to running this script
             """
             env_msg = re.sub(" +", " ", env_msg)
             env_msg = re.sub("\n +", "\n", env_msg)
@@ -46,7 +61,8 @@ class DbtSqlGenerator:
             sys.exit()
 
         dbt_project_path_msg = """What is the full file path to the dbt project? 
-        (i.e C:\\\\Users\\blake-enyart\\<dbt_project_root>")
+        (i.e C:\\Users\\blake-enyart\\<dbt_project_root>)
+        Do not add the final slash.
 
         Full file path: """
         dbt_project_path_msg = re.sub(" +", " ", dbt_project_path_msg)
@@ -129,7 +145,7 @@ class DbtSourceGenerator:
 
         print("----------------------")
         print("Using the following parameters to generate scripts:")
-        [print(f"{k.upper()}: {v}") for k,v in self.GENERATOR_CONFIG.items()]
+        [print(f"{k.upper()}: {v}") for k, v in self.GENERATOR_CONFIG.items()]
         print("----------------------")
 
         self.engine = config.engine
@@ -236,8 +252,15 @@ class DbtStageGenerator:
         self.SNOWFLAKE_SCHEMA = config.SNOWFLAKE_SCHEMA
         self.DBT_SOURCE_NAME = config.DBT_SOURCE_NAME
         self.MODEL_OUTPUT_DIR_PATH = join(config.DBT_PROJECT_PATH, "models", "staging")
+        self.STAGE_DATE_FILTER = os.getenv("STAGE_DATE_FILTER").lower()
 
-        table_filter_prompt = "Would you like to generate a single set of stage files (.sql/.yml) for one source table? (Y/n): "
+        table_filter_prompt = """
+        Would you like to generate a single set of stage files (.sql/.yml) for one source table?
+        If you want to create sets of stage files for multiple tables respond with "n".
+
+        Respond (Y/n): """
+        table_filter_prompt = re.sub(" +", " ", table_filter_prompt)
+        table_filter_prompt = re.sub("\n +", "\n", table_filter_prompt)
         text = os.getenv("TABLE_FILTER") or input(table_filter_prompt) or "y"
         text = text.lower()
         if text == "y":
@@ -263,7 +286,7 @@ class DbtStageGenerator:
 
         print("----------------------")
         print("Using the following parameters to generate scripts:")
-        [print(f"{k.upper()}: {v}") for k,v in self.GENERATOR_CONFIG.items()]
+        [print(f"{k.upper()}: {v}") for k, v in self.GENERATOR_CONFIG.items()]
         print("----------------------")
 
         self.engine = config.engine
@@ -279,20 +302,34 @@ class DbtStageGenerator:
             autoescape=select_autoescape(["html", "xml"]),
         )
 
-        # Indicates which file to get first
-        template = env.get_template(self.TEMPLATE_NAME)
-
-        # Generate Jinja SQL template
-        base_sql = template.render(self.GENERATOR_CONFIG)
+        template = env.get_template("snowflake_columns_metadata.sql.jinja")
+        columns_sql = template.render(self.GENERATOR_CONFIG)
 
         print("Gathering tables and generating stage files (.sql/.yml)...")
         print("----------------------")
         conn = self.engine.connect()
+        columns_df = pd.read_sql(columns_sql, conn)
+        table_columns = (
+            columns_df.groupby("table_name")["column_name"].apply(list).to_dict()
+        )
+        for table, columns in table_columns.items():
+            has_date_filter = any(
+                [x.lower() == self.STAGE_DATE_FILTER for x in columns]
+            )
+            table_columns[table] = has_date_filter
+            table_columns = {k.lower().strip(): v for k, v in table_columns.items()}
+
+        # Indicates which file to get first
+        template = env.get_template(self.TEMPLATE_NAME)
+        # Generate Jinja SQL template
+        base_sql = template.render(self.GENERATOR_CONFIG)
         models = conn.execute(base_sql).fetchmany(self.MODELS_TO_ITERATE)
+
         exists_cnt = 0
         create_cnt = 0
         if len(models) == 1:
-             self.produce_single_src_file(models=models)
+            self.produce_single_src_file(models=models, date_filters=table_columns)
+            sys.exit()
         for model in models:
             dir_path = join(
                 self.MODEL_OUTPUT_DIR_PATH,
@@ -319,7 +356,7 @@ class DbtStageGenerator:
 
         cancel_msg = "Cancelling generation of a set of stage files (.sql/.yml)"
         confirm_msg = "Are you sure you want to overwrite existing files? (y/N): "
-        
+
         text = ""
         while text not in ["1", "2", "3", "4"]:
             text = input(prompt_msg) or "4"
@@ -332,34 +369,51 @@ class DbtStageGenerator:
                     text = input(confirm_msg) or "n"
                     text = text.lower()
                     if text == "y":
-                        self.produce_all_src_files(models=models, overwrite=True, create=True)
+                        self.produce_all_src_files(
+                            models=models,
+                            date_filters=table_columns,
+                            overwrite=True,
+                            create=True,
+                        )
                     elif text == "n":
                         print(cancel_msg)
                         sys.exit()
                     else:
                         text = input(confirm_msg) or "n"
                         text = text.lower()
-                print(cancel_msg)
+                print(cancel_msg) if text == "n" else None
                 sys.exit()
             elif text == "2":
-                self.produce_all_src_files(models=models, overwrite=False, create=True)
+                self.produce_all_src_files(
+                    models=models,
+                    date_filters=table_columns,
+                    overwrite=False,
+                    create=True,
+                )
             elif text == "3":
                 text = ""
                 while text not in ["y", "n"]:
                     text = input(confirm_msg) or "n"
                     text = text.lower()
                     if text == "y":
-                        self.produce_all_src_files(models=models, overwrite=True, create=False)
+                        self.produce_all_src_files(
+                            models=models,
+                            date_filters=table_columns,
+                            overwrite=True,
+                            create=False,
+                        )
                     elif text == "n":
                         print(cancel_msg)
                         sys.exit()
                     else:
                         text = input(confirm_msg) or "n"
                         text = text.lower()
-                print(cancel_msg)
+                print(cancel_msg) if text == "n" else None
                 sys.exit()
 
-    def produce_all_src_files(self, models, overwrite: bool = False, create: bool = True):
+    def produce_all_src_files(
+        self, models, date_filters: dict, overwrite: bool = False, create: bool = True
+    ):
         overwrite_cnt = 0
         created_cnt = 0
 
@@ -376,19 +430,27 @@ class DbtStageGenerator:
             # file exists and overwrite is true
             if exists(sql_filepath) and overwrite:
                 self.produce_src_files(
-                    dir_path=dir_path, model=model, base_name=base_name, silent=True
+                    dir_path=dir_path,
+                    model=model,
+                    date_filters=date_filters,
+                    base_name=base_name,
+                    silent=True,
                 )
                 overwrite_cnt += 1
             # file does not exist and create is true
             elif not exists(sql_filepath) and create:
                 self.produce_src_files(
-                    dir_path=dir_path, model=model, base_name=base_name, silent=True
+                    dir_path=dir_path,
+                    model=model,
+                    date_filters=date_filters,
+                    base_name=base_name,
+                    silent=True,
                 )
                 created_cnt += 1
         success_msg = f"Created {created_cnt} set(s) of stage files and overwrote {overwrite_cnt} set(s) of stage files."
         print(success_msg)
 
-    def produce_single_src_file(self, models):
+    def produce_single_src_file(self, models, date_filters: str):
         for model in models:
             # build directories
             dir_path = join(
@@ -421,7 +483,10 @@ class DbtStageGenerator:
                     sys.exit()
                 elif text.lower() == "y":
                     self.produce_src_files(
-                        dir_path=dir_path, model=model, base_name=base_name
+                        dir_path=dir_path,
+                        model=model,
+                        date_filters=date_filters,
+                        base_name=base_name,
                     )
                 else:
                     prompt_msg = "Invalid response. Please respond with (N/y): "
@@ -433,10 +498,20 @@ class DbtStageGenerator:
                         sys.exit()
                     elif text.lower() == "y":
                         self.produce_src_files(
-                            dir_path=dir_path, model=model, base_name=base_name
+                            dir_path=dir_path,
+                            model=model,
+                            date_filters=date_filters,
+                            base_name=base_name,
                         )
 
-    def produce_src_files(self, dir_path: str, model, base_name: str, silent: bool = False):
+    def produce_src_files(
+        self,
+        dir_path: str,
+        date_filters: dict,
+        model,
+        base_name: str,
+        silent: bool = False,
+    ):
         sql_filepath = join(dir_path, model["target_name"])
 
         if exists(sql_filepath):
@@ -453,10 +528,28 @@ class DbtStageGenerator:
             Full model path: {sql_filepath}
             Full yml path: {sql_filepath.replace(".sql", ".yml")}
             """
+        table_name = (
+            model["target_name"]
+            .replace(f"stg_{self.SNOWFLAKE_SCHEMA.lower()}__", "")
+            .replace(".sql", "")
+        )
+        if date_filters[table_name]:
+            f = open("date_filter_jinja.txt", "r")
+            date_filter_jinja = f.read()
+            date_filter_jinja = date_filter_jinja.format(
+                table_name=table_name, stage_date_filter=self.STAGE_DATE_FILTER
+            )
+
+            stage_ddl = model["stage_ddl"].replace(")\n\nselect", date_filter_jinja)
+            stage_ddl = stage_ddl.replace(
+                f"from {table_name} \n", "from update_filter\n"
+            )
+        else:
+            stage_ddl = model["stage_ddl"]
 
         # build stage views
         with open(sql_filepath, "w+") as sql_file:
-            sql_file.write(model["stage_ddl"])
+            sql_file.write(stage_ddl)
             sql_file.close()
         # build yml files
         yml_filepath = sql_filepath.replace(".sql", ".yml")
@@ -472,4 +565,4 @@ class DbtStageGenerator:
 
 
 if __name__ == "__main__":
-    DbtSqlGenerator()
+    sql_gen = DbtSqlGenerator()
