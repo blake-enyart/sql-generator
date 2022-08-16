@@ -1,0 +1,38 @@
+),
+
+date_filter as (
+
+    select *
+    from {table_name}
+    {{% if target.name == 'dev' %}}
+        where {stage_date_filter}::date >= dateadd('day', -3, sysdate())::date
+    {{% elif target.name == 'tst' %}}
+        where {stage_date_filter}::date >= dateadd('day', -12, sysdate())::date
+    {{% endif %}}
+
+),
+
+most_recent_update as (
+    select
+        <placeholder>,
+        max({stage_date_filter}) as max_updated_on
+    from date_filter
+    group by <placeholder>
+),
+
+update_filter as (
+    -- Filter for only using the most recently updated row
+    -- and dedup
+    select
+        df.*,
+        row_number() over (
+            partition by df.<placeholder> order by df.{stage_date_filter} desc
+        ) as row_num
+    from date_filter as df
+    inner join most_recent_update as mru
+        on df.<placeholder> = mru.<placeholder>
+            and df.{stage_date_filter} = mru.max_updated_on
+    qualify row_num = 1
+)
+
+select

@@ -7,25 +7,23 @@ Start by installing `python` and then `pip install poetry`. After poetry is inst
 - `poetry install`
 - `poetry shell`
 
-The most developed script in the repo is the [dbt_generator.py](python_scripts/dbt_generator.py). There are two paths to using this tool to generate dbt source/staging models.
+The most developed script in the repo is the [dbt_generator.py](dbt_generator.py). There are two paths to using this tool to generate dbt source/staging models.
 
 ### Option 1
 - Duplicate the [.env.sample](.env.sample) and rename to `.env`
 - Fill out all of the variables in the new `.env` file 
-- Run `python python_scripts/dbt_generator.py` and follow the prompts to complete the generation script
+- Run `python dbt_generator.py` and follow the prompts to complete the generation script
 
 ### Option 2
 - Duplicate the [.env.sample](.env.sample) and rename to `.env`
 - Fill out only the mandatory variables in the new `.env` file 
-- Run `python python_scripts/dbt_generator.py` and follow the prompts to complete the generation script
+- Run `python dbt_generator.py` and follow the prompts to complete the generation script
 
 ### Option 3
 
 There are several other rudimentary scripts in here at the moment that generate a batch of data quality checks that consist of row counts, column counts, number of loads to the DATASTORE, and what are the oldest and newest load dates for a specific table in the DATASTORE.
 
 This script is a brittle and rudimentary SQL generator for now, but will hopefully serve as a launch point for later development.
-
-As it stands now, I (Blake Enyart) am working to use the `Embroker - Source-to-Target Verification & QA` found in the Google Drive for the **Embroker** customer as a starting point to generate this.
 
 I manually create the Souce-to-Target mapping from RAW --> STAGE --> DATASTORE in the first sheet within the worksheet while referencing the Miro diagram. From here, I copy the results as plain txt into the `CSV Export` sheet where I remove the mapping columns and ensure all RAW tables are linked to an associated STAGE and DATASTORE table. 
 
